@@ -1,4 +1,4 @@
-/** The plan the IFC tests export: two floors, a room of each kind, every kind of opening, coverings, furniture and devices. */
+/** The plan the IFC tests export: two floors, a room of each kind, every kind of opening (one wall at an angle), coverings, furniture and devices. */
 import { fromV1 } from '../../src/convert.js'
 import type { Door, Plan, Window } from '../../src/v2.js'
 import type { HousePlan } from '../../src/v1.js'
@@ -53,8 +53,25 @@ export function plan(): Plan {
         name: 'First floor',
         level: 1,
         rooms: [{ id: 'bed', name: 'Bedroom', kind: 'room', x: 2, y: 2, w: 8, h: 8 }],
-        openings: [{ id: 'bw', type: 'window', axis: 'h', x: 4, y: 2, len: 2 }],
+        // A wall at an angle (3-4-5, five metres), with a door, a window and a radiator in it.
+        drawnWalls: [{ id: 'slant', a: [12, 2], b: [18, 10], thickness: 200, height: 2500 }],
+        openings: [
+          { id: 'bw', type: 'window', axis: 'h', x: 4, y: 2, len: 2 },
+          {
+            id: 'sd',
+            type: 'door',
+            axis: 'h',
+            x: 13.2,
+            y: 3.6,
+            len: 1.8,
+            to: [14.28, 5.04],
+            hinge: 'end',
+            opens: 'left',
+          },
+          { id: 'sw', type: 'window', axis: 'h', x: 15.6, y: 6.8, len: 2, to: [16.8, 8.4] },
+        ],
         placements: [],
+        radiators: [{ id: 'srad', axis: 'h', x: 15.6, y: 6.8, len: 2, to: [16.8, 8.4], side: 'left' }],
       },
     ],
   }

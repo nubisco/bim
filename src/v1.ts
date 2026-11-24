@@ -84,12 +84,18 @@ export interface HouseOpening {
   axis: 'h' | 'v'
   /** Length in cells, in half cells. */
   len: number
+  /**
+   * On a slanted wall: the opening runs from (x, y) to here, always towards
+   * +x, and `axis` means nothing. `len` is still its width.
+   */
+  to?: [number, number]
   /** A door's hinge: the end at the lower x or y (`start`), or the other one. Default `start`. */
   hinge?: 'start' | 'end'
   /**
    * The side a door swings into, as seen on the plan: `up` or `down` for a
    * door in a wall running along x, `left` or `right` along y. Default
-   * `down` or `right`.
+   * `down` or `right`. On a slanted wall, `left` or `right` as seen going
+   * from (x, y) to `to`, as version 2 names a wall's sides. Default `right`.
    */
   opens?: 'up' | 'down' | 'left' | 'right'
   /** A door with a glass leaf, such as a French door. Glass can carry coverings. */
@@ -148,10 +154,9 @@ export interface HousePlacement {
 }
 
 /**
- * A radiator on a wall. It sits on a wall line like a door or window (whole
- * cells across the wall, half cells along it), and hangs on one side of it,
- * named the way a door's swing is. It is plumbing, not a device: a heating
- * circuit serving its room runs through it.
+ * A radiator on a wall. It sits on a wall line like a door or window, and
+ * hangs on one side of it, named the way a door's swing is. It is plumbing,
+ * not a device: a heating circuit serving its room runs through it.
  */
 export interface HouseRadiator {
   id: string
@@ -160,7 +165,13 @@ export interface HouseRadiator {
   axis: 'h' | 'v'
   /** Width in cells, in half cells. */
   len: number
-  /** The side of the wall it hangs on: `up` or `down` along x, `left` or `right` along y. */
+  /** On a slanted wall: it runs from (x, y) to here, towards +x, as an opening does. */
+  to?: [number, number]
+  /**
+   * The side of the wall it hangs on: `up` or `down` along x, `left` or
+   * `right` along y. On a slanted wall, `left` or `right` going from (x, y)
+   * to `to`.
+   */
   side: 'up' | 'down' | 'left' | 'right'
 }
 

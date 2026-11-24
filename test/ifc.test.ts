@@ -31,16 +31,16 @@ describe('IFC export', () => {
     // A slab under every walled room.
     expect(count(ifc, 'IFCSLAB')).toBe(3)
     // Every opening voids its wall, a gap included, and only doors and windows fill one.
-    expect(count(ifc, 'IFCOPENINGELEMENT')).toBe(6)
-    expect(count(ifc, 'IFCRELVOIDSELEMENT')).toBe(6)
-    expect(count(ifc, 'IFCDOOR')).toBe(3)
-    expect(count(ifc, 'IFCWINDOW')).toBe(2)
-    expect(count(ifc, 'IFCRELFILLSELEMENT')).toBe(5)
+    expect(count(ifc, 'IFCOPENINGELEMENT')).toBe(8)
+    expect(count(ifc, 'IFCRELVOIDSELEMENT')).toBe(8)
+    expect(count(ifc, 'IFCDOOR')).toBe(4)
+    expect(count(ifc, 'IFCWINDOW')).toBe(3)
+    expect(count(ifc, 'IFCRELFILLSELEMENT')).toBe(7)
     // The shutter the device drives, the curtains and the awning.
     expect(count(ifc, 'IFCSHADINGDEVICE')).toBe(3)
     expect(count(ifc, 'IFCSANITARYTERMINAL')).toBe(1)
     expect(count(ifc, 'IFCFURNITURE')).toBe(2)
-    expect(count(ifc, 'IFCSPACEHEATER')).toBe(1)
+    expect(count(ifc, 'IFCSPACEHEATER')).toBe(2)
     // Only the devices the caller named.
     expect(count(ifc, 'IFCLIGHTFIXTURE')).toBe(1)
     expect(count(ifc, 'IFCACTUATOR')).toBe(1)
