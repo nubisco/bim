@@ -1,0 +1,6 @@
+dist/
+node_modules/
+CHANGELOG.md
+LICENSE
+test/fixtures/*.ifc
+pnpm-lock.yaml

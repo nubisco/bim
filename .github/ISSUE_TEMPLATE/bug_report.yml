@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a reproducible problem with the model, the conversion or IFC
+labels: [bug]
+assignees: [joseporto]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - The plan model (v2) or its validation
+        - Version 1 and the conversion
+        - Plan geometry (cells, edges)
+        - IFC export
+        - IFC import
+        - Edit history
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      placeholder: '1.0.0'
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: A small plan as JSON, or an IFC file with nothing private in it, and the call that misbehaves.
+    validations:
+      required: true
+  - type: textarea
+    id: tool
+    attributes:
+      label: For IFC, the other software
+      description: Which tool wrote or opened the file, and its version (Revit, ArchiCAD, Bonsai, ...).

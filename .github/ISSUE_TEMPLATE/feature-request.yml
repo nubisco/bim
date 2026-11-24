@@ -1,0 +1,16 @@
+name: Feature request
+description: Something the model, the IFC export or the import should cover
+labels: [enhancement]
+assignees: [joseporto]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you need, and why
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: An example
+      description: A plan, or a part of an IFC file, that shows it.
