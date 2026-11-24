@@ -1,6 +1,6 @@
 {
   "name": "@nubisco/bim",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "A building as a model: storeys, walls, spaces, doors and windows in millimetres, with validation, plan geometry, and an IFC4 writer and reader. Pure TypeScript, for the browser and Node alike.",
   "license": "MIT",
   "author": "José Silva <jose@nubisco.io>",
