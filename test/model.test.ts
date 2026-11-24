@@ -365,6 +365,126 @@ describe('walls drawn on their own', () => {
   })
 })
 
+describe('doors, windows and radiators on slanted walls', () => {
+  // A room with a 3-4-5 slanted side, five metres long, and a fence drawn
+  // towards -x, also five metres.
+  function slanted(): HousePlan {
+    return {
+      version: 1,
+      grid: 0.5,
+      plot: { w: 30, h: 20 },
+      floors: [
+        {
+          id: 'g',
+          name: 'Ground floor',
+          level: 0,
+          rooms: [
+            {
+              id: 'r',
+              name: 'Room',
+              kind: 'room',
+              x: 2,
+              y: 2,
+              w: 14,
+              h: 8,
+              outline: [
+                [2, 2],
+                [10, 2],
+                [16, 10],
+                [2, 10],
+              ],
+            },
+          ],
+          drawnWalls: [{ id: 'fence', a: [28, 4], b: [22, 12], thickness: 50, height: 1200 }],
+          openings: [
+            // 900 mm wide, a metre along the room's slanted side from its top end.
+            {
+              id: 'd1',
+              type: 'door',
+              axis: 'h',
+              x: 11.2,
+              y: 3.6,
+              len: 1.8,
+              to: [12.28, 5.04],
+              hinge: 'end',
+              opens: 'left',
+            },
+            // A metre wide, a metre to two metres along the fence from its first end.
+            { id: 'w1', type: 'window', axis: 'h', x: 25.6, y: 7.2, len: 2, to: [26.8, 5.6] },
+            { id: 'd2', type: 'door', axis: 'h', x: 23.2, y: 10.4, len: 1.8, to: [24.28, 8.96], opens: 'left' },
+          ],
+          placements: [],
+          radiators: [{ id: 'rad', axis: 'h', x: 4, y: 10, len: 2, side: 'up' }],
+        },
+      ],
+    }
+  }
+  const slantedWall = (p: Plan) =>
+    storey(p, 'g').walls.find((w) => w.a[0] !== w.b[0] && w.a[1] !== w.b[1] && w.id !== 'fence')!
+
+  it('sit in their wall by how far along it they are, to the millimetre', () => {
+    const { plan, dropped } = fromV1(slanted())
+    expect(dropped).toEqual([])
+    const w = slantedWall(plan)
+    const d1 = opening<Door>(plan, 'd1')
+    const forward = w.b[0] > w.a[0]
+    expect(d1).toMatchObject({ wall: w.id, width: 900 })
+    // A door's hinge and side are the wall's, so they swap if the wall runs the other way.
+    expect(d1).toMatchObject(
+      forward ? { at: 1000, hinge: 'end', opens: 'left' } : { at: 3100, hinge: 'start', opens: 'right' },
+    )
+    expect(opening<Window>(plan, 'w1')).toMatchObject({ wall: 'fence', at: 1000, width: 1000 })
+  })
+
+  it('turn round with a wall that runs towards -x', () => {
+    // On the fence, (x, y) is four metres from its first end, so the hinge there is at the door's far end.
+    expect(opening<Door>(fromV1(slanted()).plan, 'd2')).toMatchObject({
+      wall: 'fence',
+      at: 3100,
+      width: 900,
+      hinge: 'end',
+      opens: 'right',
+    })
+  })
+
+  it('come back the way they were drawn, and round again exactly', () => {
+    const plan = fromV1(slanted()).plan
+    const view = toV1(plan)
+    const [d1, w1, d2] = view.floors[0].openings
+    const near = (o: (typeof view.floors)[0]['openings'][0], x: number, y: number, to: [number, number]) => {
+      expect(o.x).toBeCloseTo(x, 9)
+      expect(o.y).toBeCloseTo(y, 9)
+      expect(o.to?.[0]).toBeCloseTo(to[0], 9)
+      expect(o.to?.[1]).toBeCloseTo(to[1], 9)
+    }
+    near(d1, 11.2, 3.6, [12.28, 5.04])
+    near(w1, 25.6, 7.2, [26.8, 5.6])
+    near(d2, 23.2, 10.4, [24.28, 8.96])
+    expect([d1.len, d1.hinge, d1.opens]).toEqual([1.8, 'end', 'left'])
+    expect([d2.hinge, d2.opens]).toEqual([undefined, 'left'])
+    expect(fromV1(view, plan).plan).toEqual(plan)
+  })
+
+  it('keep a radiator on a slanted wall, written towards +x', () => {
+    const p = slanted()
+    p.floors[0].radiators = [{ id: 'rad', axis: 'h', x: 25.6, y: 7.2, len: 2, to: [26.8, 5.6], side: 'left' }]
+    const plan = fromV1(p).plan
+    expect(storey(plan, 'g').radiators).toEqual([{ id: 'rad', a: [12800, 3600], b: [13400, 2800], side: 'left' }])
+    // Stored the other way round, it is written towards +x again, on the same side.
+    const r = storey(plan, 'g').radiators[0]
+    Object.assign(r, { a: r.b, b: r.a, side: 'right' })
+    expect(toV1(plan).floors[0].radiators).toEqual([
+      { id: 'rad', axis: 'h', x: 25.6, y: 7.2, len: 2, to: [26.8, 5.6], side: 'left' },
+    ])
+  })
+
+  it('drops one that is off every wall', () => {
+    const p = slanted()
+    p.floors[0].openings = [{ id: 'lost', type: 'door', axis: 'h', x: 11.2, y: 4, len: 1.8, to: [12.28, 5.44] }]
+    expect(fromV1(p).dropped).toEqual(['Ground floor: door lost'])
+  })
+})
+
 describe('dimension lines from the Ruler', () => {
   function measured(): HousePlan {
     const p = v1()

@@ -62,6 +62,13 @@ function fromWallSide(axis: 'h' | 'v', side: 'left' | 'right'): Side {
 
 const axisOf = (a: Point, b: Point): 'h' | 'v' | null => (a[1] === b[1] ? 'h' : a[0] === b[0] ? 'v' : null)
 
+/** The other side, or the other end: what a door or radiator says when its wall is turned round. */
+const otherSide = (s: 'left' | 'right'): 'left' | 'right' => (s === 'left' ? 'right' : 'left')
+const otherEnd = (e: 'start' | 'end'): 'start' | 'end' => (e === 'start' ? 'end' : 'start')
+
+/** A slanted opening's or radiator's side in version 1: `left` or `right`, default `right`. */
+const slantSide = (s: Side | undefined): 'left' | 'right' => (s === 'left' ? 'left' : 'right')
+
 // ─── Walls ──────────────────────────────────────────────────────────────────
 
 /** A room's outline and holes, in millimetres. */
@@ -154,8 +161,31 @@ function makeWalls(floor: V1.HouseFloor, prev: Wall[]): Wall[] {
 
 // ─── Openings ───────────────────────────────────────────────────────────────
 
-/** The wall a version 1 opening sits in, and where along it. */
-function host(o: V1.HouseOpening, walls: Wall[]): { wall: Wall; at: number } | null {
+/** How far off a wall's line a slanted opening's ends may be, in millimetres: they are not whole millimetres. */
+const ON_LINE = 1
+
+/**
+ * The wall a version 1 opening sits in, and where along it. `flip` when it
+ * runs against the wall, as a slanted one does in a wall running towards -x.
+ */
+function host(o: V1.HouseOpening, walls: Wall[]): { wall: Wall; at: number; flip: boolean } | null {
+  if (o.to) {
+    // Not rounded: the ends lie on the wall only to a fraction of a millimetre.
+    const p: Point = [o.x * CELL, o.y * CELL]
+    const q: Point = [o.to[0] * CELL, o.to[1] * CELL]
+    const width = mm(o.len)
+    for (const w of walls) {
+      const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1])
+      const d: Point = [(w.b[0] - w.a[0]) / len, (w.b[1] - w.a[1]) / len]
+      const off = (r: Point) => Math.abs((r[0] - w.a[0]) * d[1] - (r[1] - w.a[1]) * d[0])
+      if (off(p) > ON_LINE || off(q) > ON_LINE) continue
+      const along = (r: Point) => (r[0] - w.a[0]) * d[0] + (r[1] - w.a[1]) * d[1]
+      const flip = along(q) < along(p)
+      const at = Math.round(Math.min(along(p), along(q)))
+      if (at >= 0 && at + width <= Math.round(len)) return { wall: w, at, flip }
+    }
+    return null
+  }
   const [s, e] = o.axis === 'h' ? [o.x, o.x + o.len] : [o.y, o.y + o.len]
   const line = o.axis === 'h' ? mm(o.y) : mm(o.x)
   for (const w of walls) {
@@ -163,20 +193,23 @@ function host(o: V1.HouseOpening, walls: Wall[]): { wall: Wall; at: number } | n
     const k = o.axis === 'h' ? 1 : 0
     const i = o.axis === 'h' ? 0 : 1
     if (w.a[k] !== line) continue
-    if (mm(s) >= w.a[i] && mm(e) <= w.b[i]) return { wall: w, at: mm(s) - w.a[i] }
+    if (mm(s) >= w.a[i] && mm(e) <= w.b[i]) return { wall: w, at: mm(s) - w.a[i], flip: false }
   }
   return null
 }
 
-function makeOpening(o: V1.HouseOpening, wall: Wall, at: number, prev: Opening | undefined): Opening {
+function makeOpening(o: V1.HouseOpening, wall: Wall, at: number, flip: boolean, prev: Opening | undefined): Opening {
   const base = { id: o.id, wall: wall.id, at, width: mm(o.len) }
   if (o.type === 'open') return { ...base, kind: 'gap' }
   const swing = (x: Opening): x is Door | Window => x.kind !== 'gap'
   const old = prev && swing(prev) ? prev : undefined
-  const sides = (): Pick<Door, 'hinge' | 'opens'> => ({
-    hinge: o.hinge ?? 'start',
-    opens: toWallSide(o.axis, o.opens ?? (o.axis === 'h' ? 'down' : 'right')),
-  })
+  const sides = (): Pick<Door, 'hinge' | 'opens'> => {
+    if (!o.to)
+      return { hinge: o.hinge ?? 'start', opens: toWallSide(o.axis, o.opens ?? (o.axis === 'h' ? 'down' : 'right')) }
+    const hinge = o.hinge ?? 'start'
+    const opens = slantSide(o.opens)
+    return { hinge: flip ? otherEnd(hinge) : hinge, opens: flip ? otherSide(opens) : opens }
+  }
   // What the editor said wins over what was stored. Frame and coverings
   // carry over to another kind of element, the rest only to the same kind.
   const spec = o.spec
@@ -274,6 +307,7 @@ export function fromV1(p: V1.HousePlan, previous?: Plan | null): Migration {
           o,
           h.wall,
           h.at,
+          h.flip,
           before?.openings.find((x) => x.id === o.id),
         ),
       )
@@ -341,6 +375,7 @@ export function fromV1(p: V1.HousePlan, previous?: Plan | null): Migration {
 
     const radiators = (f.radiators ?? []).map((r): Radiator => {
       const a: Point = [mm(r.x), mm(r.y)]
+      if (r.to) return { id: r.id, a, b: [mm(r.to[0]), mm(r.to[1])], side: slantSide(r.side) }
       const b: Point = r.axis === 'h' ? [mm(r.x + r.len), mm(r.y)] : [mm(r.x), mm(r.y + r.len)]
       return { id: r.id, a, b, side: toWallSide(r.axis, r.side) }
     })
@@ -436,18 +471,34 @@ function roomOf(s: Space): V1.HouseRoom {
   return room
 }
 
-function openingOf(o: Opening, wall: Wall): V1.HouseOpening | null {
+/**
+ * An opening in a slanted wall, from its end nearer -x to the other. Its
+ * ends are not whole millimetres: `len` keeps the width exact, and the wall
+ * it is found in again gives back `at`.
+ */
+function slantedOpening(o: Opening, wall: Wall): V1.HouseOpening {
+  const len = Math.hypot(wall.b[0] - wall.a[0], wall.b[1] - wall.a[1])
+  const d: Point = [(wall.b[0] - wall.a[0]) / len, (wall.b[1] - wall.a[1]) / len]
+  const flip = d[0] < 0
+  const point = (t: number): [number, number] => [cells(wall.a[0] + d[0] * t), cells(wall.a[1] + d[1] * t)]
+  const [x, y] = point(flip ? o.at + o.width : o.at)
+  return { id: o.id, type: 'door', axis: 'h', x, y, len: cells(o.width), to: point(flip ? o.at : o.at + o.width) }
+}
+
+function openingOf(o: Opening, wall: Wall): V1.HouseOpening {
   const axis = axisOf(wall.a, wall.b)
-  if (!axis) return null
-  const i = axis === 'h' ? 0 : 1
-  const dir = Math.sign(wall.b[i] - wall.a[i]) || 1
-  const s = dir > 0 ? wall.a[i] + o.at : wall.a[i] - o.at - o.width
-  const at = cells(s)
-  const len = cells(o.width)
-  const out: V1.HouseOpening =
-    axis === 'h'
-      ? { id: o.id, type: 'door', axis, x: at, y: cells(wall.a[1]), len }
-      : { id: o.id, type: 'door', axis, x: cells(wall.a[0]), y: at, len }
+  let out: V1.HouseOpening
+  if (!axis) out = slantedOpening(o, wall)
+  else {
+    const i = axis === 'h' ? 0 : 1
+    const dir = Math.sign(wall.b[i] - wall.a[i]) || 1
+    const at = cells(dir > 0 ? wall.a[i] + o.at : wall.a[i] - o.at - o.width)
+    const len = cells(o.width)
+    out =
+      axis === 'h'
+        ? { id: o.id, type: 'door', axis, x: at, y: cells(wall.a[1]), len }
+        : { id: o.id, type: 'door', axis, x: cells(wall.a[0]), y: at, len }
+  }
   if (o.kind === 'gap') return { ...out, type: 'open' }
   if (o.kind === 'window') out.type = 'window'
   else if (o.operation === 'sliding' || o.operation === 'lift-slide') out.type = 'slider'
@@ -457,12 +508,14 @@ function openingOf(o: Opening, wall: Wall): V1.HouseOpening | null {
   if (o.frame) spec.frame = { ...o.frame }
   if (isGlazed(o)) spec.coverings = (o.coverings ?? []).map((c) => ({ ...c }))
   out.spec = spec
+  // The hinge and side as version 1 says them. A slanted one is written
+  // towards +x, so against a wall that runs the other way they swap.
+  const flip = !axis && wall.b[0] < wall.a[0]
+  const hinge = o.hinge && (flip ? otherEnd(o.hinge) : o.hinge)
+  const opens = !o.opens ? undefined : !axis ? (flip ? otherSide(o.opens) : o.opens) : fromWallSide(axis, o.opens)
   // Version 1 leaves the usual hinge and side unsaid.
-  if (o.hinge === 'end') out.hinge = 'end'
-  if (o.opens) {
-    const side = fromWallSide(axis, o.opens)
-    if (side !== (axis === 'h' ? 'down' : 'right')) out.opens = side
-  }
+  if (hinge === 'end') out.hinge = 'end'
+  if (opens && opens !== (axis === 'h' ? 'down' : 'right')) out.opens = opens
   return out
 }
 
@@ -472,8 +525,7 @@ export function toV1(p: Plan): V1.HousePlan {
     const openings: V1.HouseOpening[] = []
     for (const o of s.openings) {
       const w = walls.get(o.wall)
-      const v = w ? openingOf(o, w) : null
-      if (v) openings.push(v)
+      if (w) openings.push(openingOf(o, w))
     }
     const floor: V1.HouseFloor = {
       id: s.id,
@@ -496,7 +548,12 @@ export function toV1(p: Plan): V1.HousePlan {
     }
     const radiators = s.radiators.flatMap((r): V1.HouseRadiator[] => {
       const axis = axisOf(r.a, r.b)
-      if (!axis) return []
+      if (!axis) {
+        // Towards +x, as a slanted opening is written.
+        const [a, b, side] = r.a[0] < r.b[0] ? [r.a, r.b, r.side] : [r.b, r.a, otherSide(r.side)]
+        const len = cells(Math.hypot(b[0] - a[0], b[1] - a[1]))
+        return [{ id: r.id, axis: 'h', x: cells(a[0]), y: cells(a[1]), len, to: [cells(b[0]), cells(b[1])], side }]
+      }
       const i = axis === 'h' ? 0 : 1
       const lo = Math.min(r.a[i], r.b[i])
       const len = cells(Math.abs(r.b[i] - r.a[i]))
